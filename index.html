@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Timer (v1)</title>
+  <title>Timer (v2)</title>
   <style>
     html, body {
       margin: 0;
@@ -48,6 +48,7 @@
       background: #fff;
       color: #212529;
       cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
 
     .mode-btn.active {
@@ -56,9 +57,32 @@
       color: #fff;
     }
 
+    /* デモ：白背景・青枠/青文字 */
     .preset-btn.demo {
       border-color: #0095D9;
+      background: #fff;
       color: #0095D9;
+    }
+
+    .preset-btn.demo.active {
+      border-color: #0095D9;
+      background: #fff;
+      color: #0095D9;
+      box-shadow: 0 0 0 2px rgba(0, 149, 217, 0.25);
+    }
+
+    /* 通常：青背景・白文字 */
+    .preset-btn.normal {
+      border-color: #0095D9;
+      background: #0095D9;
+      color: #fff;
+    }
+
+    .preset-btn.normal.active {
+      border-color: #0095D9;
+      background: #0095D9;
+      color: #fff;
+      box-shadow: 0 0 0 2px rgba(0, 149, 217, 0.25);
     }
 
     .setting-row {
@@ -153,17 +177,17 @@
       </div>
 
       <div class="preset-switch">
-        <button id="demoPresetBtn" class="preset-btn demo">デモ：集中5秒 / 休憩2秒</button>
-        <button id="normalPresetBtn" class="preset-btn">通常：集中25分 / 休憩5分</button>
+        <button id="demoPresetBtn" class="preset-btn demo active">デモ：集中5秒 / 休憩2秒</button>
+        <button id="normalPresetBtn" class="preset-btn normal">通常：集中25分 / 休憩5分</button>
       </div>
 
       <div class="setting-row">
         <span>集中</span>
         <input id="focusInput" type="number" min="1" max="180" value="5" />
-        <span>秒</span>
+        <span id="focusUnit">秒</span>
         <span>／ 休憩</span>
         <input id="breakInput" type="number" min="1" max="180" value="2" />
-        <span>秒</span>
+        <span id="breakUnit">秒</span>
         <button id="setBtn" class="round-btn small">セット</button>
       </div>
     </div>
@@ -179,7 +203,6 @@
   </div>
 
   <script>
-    // 0: オフ, 1: 小さい, 2: 普通, 3: 大きい
     const VOLUME_LEVELS = [
       { label: "音: オフ", gain: 0 },
       { label: "音: 小", gain: 0.04 },
@@ -187,18 +210,21 @@
       { label: "音: 大", gain: 0.32 }
     ];
 
+    let unitMode = "sec"; // "sec"（デモ・秒） | "min"（通常・分）
     let focusSec = 5;
     let breakSec = 2;
     let mode = "focus"; // "focus" | "break"
     let sec = focusSec;
     let running = false;
-    let volumeIndex = 2; // 初期値は「普通」
+    let volumeIndex = 2;
     let audioCtx = null;
 
     const timeEl = document.getElementById("time");
     const statusLabel = document.getElementById("statusLabel");
     const focusInput = document.getElementById("focusInput");
     const breakInput = document.getElementById("breakInput");
+    const focusUnit = document.getElementById("focusUnit");
+    const breakUnit = document.getElementById("breakUnit");
     const focusTab = document.getElementById("focusTab");
     const breakTab = document.getElementById("breakTab");
     const soundBtn = document.getElementById("soundBtn");
@@ -233,7 +259,7 @@
           ? [659.25, 523.25]
           : type === "breakEnd"
           ? [523.25, 659.25, 783.99]
-          : [587.33]; // プレビュー音
+          : [587.33];
 
       notes.forEach((freq, idx) => {
         const osc = audioCtx.createOscillator();
@@ -258,8 +284,15 @@
       const s = String(sec % 60).padStart(2, "0");
       timeEl.textContent = `${m}:${s}`;
       statusLabel.textContent = mode === "focus" ? "集中モード" : "休憩モード";
-      focusInput.value = focusSec;
-      breakInput.value = breakSec;
+
+      const isMin = unitMode === "min";
+      focusUnit.textContent = isMin ? "分" : "秒";
+      breakUnit.textContent = isMin ? "分" : "秒";
+      focusInput.value = isMin ? Math.max(1, Math.round(focusSec / 60)) : focusSec;
+      breakInput.value = isMin ? Math.max(1, Math.round(breakSec / 60)) : breakSec;
+
+      demoPresetBtn.classList.toggle("active", !isMin);
+      normalPresetBtn.classList.toggle("active", isMin);
 
       const currentVol = VOLUME_LEVELS[volumeIndex];
       soundBtn.textContent = currentVol.label;
@@ -272,10 +305,11 @@
       stopBtn.style.display = running ? "inline-block" : "none";
     }
 
-    function applyCycle(newFocusSec, newBreakSec) {
+    function applyCycle(newFocusSec, newBreakSec, nextUnitMode = unitMode) {
       running = false;
-      focusSec = Math.max(1, Number(newFocusSec) || 5);
-      breakSec = Math.max(1, Number(newBreakSec) || 2);
+      unitMode = nextUnitMode;
+      focusSec = Math.max(1, Number(newFocusSec) || 1);
+      breakSec = Math.max(1, Number(newBreakSec) || 1);
       mode = "focus";
       sec = focusSec;
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -298,10 +332,19 @@
     focusTab.onclick = () => switchMode("focus");
     breakTab.onclick = () => switchMode("break");
 
-    demoPresetBtn.onclick = () => applyCycle(5, 2);
-    normalPresetBtn.onclick = () => applyCycle(25 * 60, 5 * 60);
+    // デモ：秒単位・白ボタン
+    demoPresetBtn.onclick = () => applyCycle(5, 2, "sec");
 
-    setBtn.onclick = () => applyCycle(focusInput.value, breakInput.value);
+    // 通常：分単位・青ボタン
+    normalPresetBtn.onclick = () => applyCycle(25 * 60, 5 * 60, "min");
+
+    // セットボタン：現在の単位（分または秒）に合わせて反映
+    setBtn.onclick = () => {
+      const multiplier = unitMode === "min" ? 60 : 1;
+      const fVal = Math.max(1, Number(focusInput.value) || 1) * multiplier;
+      const bVal = Math.max(1, Number(breakInput.value) || 1) * multiplier;
+      applyCycle(fVal, bVal, unitMode);
+    };
 
     startBtn.onclick = () => {
       initAudio();
