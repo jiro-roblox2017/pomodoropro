@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #F8F9FA;
+      color: #212529;
+      font-family: sans-serif;
+    }
+
+    .wrap {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .top {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #time {
+      font-size: 72px;
+      font-weight: bold;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btns {
+      display: flex;
+      gap: 10px;
+    }
+
+    button, input {
+      font-size: 16px;
+      padding: 6px 12px;
+      border: 1px solid #212529;
+      background: #fff;
+      color: #212529;
+      cursor: pointer;
+    }
+
+    #startBtn {
+      background: #0095D9;
+      color: #fff;
+      border-color: #0095D9;
+    }
+
+    body.running .top,
+    body.running #resetBtn {
+      display: none;
+    }
+
+    body.running #time {
+      font-size: 120px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <input id="minInput" type="number" min="1" max="180" value="25" style="width:70px;" />
+      <span>分</span>
+      <button id="setBtn">セット</button>
+    </div>
+
+    <div id="time">25:00</div>
+
+    <div class="btns">
+      <button id="startBtn">開始</button>
+      <button id="stopBtn" style="display:none;">停止</button>
+      <button id="resetBtn">リセット</button>
+    </div>
+  </div>
+
+  <script>
+    let baseMin = 25;
+    let sec = baseMin * 60;
+    let running = false;
+
+    const timeEl = document.getElementById("time");
+    const minInput = document.getElementById("minInput");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const setBtn = document.getElementById("setBtn");
+
+    function render() {
+      const m = String(Math.floor(sec / 60)).padStart(2, "0");
+      const s = String(sec % 60).padStart(2, "0");
+      timeEl.textContent = `${m}:${s}`;
+      document.body.classList.toggle("running", running);
+      startBtn.style.display = running ? "none" : "inline-block";
+      stopBtn.style.display = running ? "inline-block" : "none";
+    }
+
+    setBtn.onclick = () => {
+      running = false;
+      baseMin = Math.max(1, Number(minInput.value) || 25);
+      sec = baseMin * 60;
+      render();
+    };
+
+    startBtn.onclick = () => {
+      running = true;
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      render();
+    };
+
+    stopBtn.onclick = () => {
+      running = false;
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      render();
+    };
+
+    resetBtn.onclick = () => {
+      running = false;
+      sec = baseMin * 60;
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      render();
+    };
+
+    setInterval(() => {
+      if (!running) return;
+      if (sec > 0) {
+        sec--;
+        render();
+      } else {
+        running = false;
+        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        render();
+        alert("終了！");
+      }
+    }, 1000);
+
+    render();
+  </script>
+</body>
+</html>
