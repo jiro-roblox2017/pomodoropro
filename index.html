@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Timer (v3)</title>
+  <title>Timer (v4)</title>
   <style>
     html, body {
       margin: 0;
@@ -165,6 +165,7 @@
       background: #fff;
       color: #212529;
       cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
 
     .mode-btn.active {
@@ -219,6 +220,15 @@
       background: #fff;
       color: #212529;
       cursor: pointer;
+      transition: transform 0.1s ease, opacity 0.15s ease;
+    }
+
+    .round-btn:hover {
+      opacity: 0.88;
+    }
+
+    .round-btn:active {
+      transform: scale(0.97);
     }
 
     .round-btn.small {
@@ -267,10 +277,10 @@
 <body>
   <div class="wrap">
     <div class="hud-top">
-      <!-- ① 時刻枠 -->
+      <!-- ① 時刻・天気枠 -->
       <div class="clock-box">
-        <div class="clock-time" id="clockTime">12：34<span style="font-size:20px;margin-left:6px;">東京</span></div>
-        <div class="clock-sub">東京晴れ23度</div>
+        <div class="clock-time" id="clockTime">12：34<span style="font-size:20px;margin-left:6px;">北区</span></div>
+        <div class="clock-sub" id="weatherSub">北区の天気を取得中...</div>
       </div>
 
       <!-- ② 目標枠 -->
@@ -365,13 +375,37 @@
     const resetBtn = document.getElementById("resetBtn");
     const setBtn = document.getElementById("setBtn");
     const clockTimeEl = document.getElementById("clockTime");
+    const weatherSubEl = document.getElementById("weatherSub");
     const streakDaysEl = document.getElementById("streakDays");
 
     function updateClock() {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, "0");
       const mm = String(now.getMinutes()).padStart(2, "0");
-      clockTimeEl.innerHTML = `${hh}：${mm}<span style="font-size:20px;margin-left:6px;">東京</span>`;
+      clockTimeEl.innerHTML = `${hh}：${mm}<span style="font-size:20px;margin-left:6px;">北区</span>`;
+    }
+
+    async function fetchKitaWeather() {
+      const url =
+        "https://api.open-meteo.com/v1/forecast?latitude=35.7528&longitude=139.7337&current=temperature_2m,weather_code&timezone=Asia%2FTokyo";
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const temp = Math.round(data.current.temperature_2m);
+        const code = data.current.weather_code;
+
+        let weatherText = "晴れ";
+        if (code === 0 || code === 1) weatherText = "晴れ";
+        else if (code === 2 || code === 3) weatherText = "くもり";
+        else if (code >= 45 && code <= 48) weatherText = "霧";
+        else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) weatherText = "雨";
+        else if (code >= 71 && code <= 77) weatherText = "雪";
+        else if (code >= 95) weatherText = "雷雨";
+
+        weatherSubEl.textContent = `北区${weatherText}${temp}度`;
+      } catch (e) {
+        weatherSubEl.textContent = "北区の天気取得失敗";
+      }
     }
 
     function renderStreak() {
@@ -535,6 +569,8 @@
 
     updateClock();
     setInterval(updateClock, 10000);
+    fetchKitaWeather();
+    setInterval(fetchKitaWeather, 600000);
     renderStreak();
     render();
   </script>
