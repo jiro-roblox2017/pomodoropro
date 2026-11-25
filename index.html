@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Timer (Demo + Sound)</title>
+  <title>Timer (v1)</title>
   <style>
     html, body {
       margin: 0;
@@ -149,7 +149,7 @@
       <div class="mode-switch">
         <button id="focusTab" class="mode-btn active">集中</button>
         <button id="breakTab" class="mode-btn">休憩</button>
-        <button id="soundBtn" class="mode-btn">音: ON</button>
+        <button id="soundBtn" class="mode-btn active">音: 中</button>
       </div>
 
       <div class="preset-switch">
@@ -179,13 +179,20 @@
   </div>
 
   <script>
-    // デモ用に初期値を 集中5秒 / 休憩2秒 に設定
+    // 0: オフ, 1: 小さい, 2: 普通, 3: 大きい
+    const VOLUME_LEVELS = [
+      { label: "音: オフ", gain: 0 },
+      { label: "音: 小", gain: 0.04 },
+      { label: "音: 中", gain: 0.14 },
+      { label: "音: 大", gain: 0.32 }
+    ];
+
     let focusSec = 5;
     let breakSec = 2;
     let mode = "focus"; // "focus" | "break"
     let sec = focusSec;
     let running = false;
-    let soundOn = true;
+    let volumeIndex = 2; // 初期値は「普通」
     let audioCtx = null;
 
     const timeEl = document.getElementById("time");
@@ -214,13 +221,19 @@
       }
     }
 
-    function playSound(type = "focusEnd") {
-      if (!soundOn) return;
+    function playSound(type = "preview") {
+      const vol = VOLUME_LEVELS[volumeIndex].gain;
+      if (vol <= 0) return;
       initAudio();
       if (!audioCtx) return;
 
       const now = audioCtx.currentTime;
-      const notes = type === "focusEnd" ? [659.25, 523.25] : [523.25, 659.25, 783.99];
+      const notes =
+        type === "focusEnd"
+          ? [659.25, 523.25]
+          : type === "breakEnd"
+          ? [523.25, 659.25, 783.99]
+          : [587.33]; // プレビュー音
 
       notes.forEach((freq, idx) => {
         const osc = audioCtx.createOscillator();
@@ -229,14 +242,14 @@
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, now + idx * 0.14);
 
-        gain.gain.setValueAtTime(0.12, now + idx * 0.14);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.25);
+        gain.gain.setValueAtTime(vol, now + idx * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.14 + 0.24);
 
         osc.connect(gain);
         gain.connect(audioCtx.destination);
 
         osc.start(now + idx * 0.14);
-        osc.stop(now + idx * 0.14 + 0.26);
+        osc.stop(now + idx * 0.14 + 0.25);
       });
     }
 
@@ -247,8 +260,11 @@
       statusLabel.textContent = mode === "focus" ? "集中モード" : "休憩モード";
       focusInput.value = focusSec;
       breakInput.value = breakSec;
-      soundBtn.textContent = soundOn ? "音: ON" : "音: OFF";
-      soundBtn.classList.toggle("active", soundOn);
+
+      const currentVol = VOLUME_LEVELS[volumeIndex];
+      soundBtn.textContent = currentVol.label;
+      soundBtn.classList.toggle("active", volumeIndex > 0);
+
       document.body.classList.toggle("running", running);
       focusTab.classList.toggle("active", mode === "focus");
       breakTab.classList.toggle("active", mode === "break");
@@ -274,12 +290,9 @@
     }
 
     soundBtn.onclick = () => {
-      soundOn = !soundOn;
-      if (soundOn) {
-        initAudio();
-        playSound("breakEnd");
-      }
+      volumeIndex = (volumeIndex + 1) % VOLUME_LEVELS.length;
       render();
+      playSound("preview");
     };
 
     focusTab.onclick = () => switchMode("focus");
