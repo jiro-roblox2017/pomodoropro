@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Timer (Demo)</title>
+  <title>Timer (Demo + Sound)</title>
   <style>
     html, body {
       margin: 0;
@@ -149,6 +149,7 @@
       <div class="mode-switch">
         <button id="focusTab" class="mode-btn active">集中</button>
         <button id="breakTab" class="mode-btn">休憩</button>
+        <button id="soundBtn" class="mode-btn">音: ON</button>
       </div>
 
       <div class="preset-switch">
@@ -184,6 +185,8 @@
     let mode = "focus"; // "focus" | "break"
     let sec = focusSec;
     let running = false;
+    let soundOn = true;
+    let audioCtx = null;
 
     const timeEl = document.getElementById("time");
     const statusLabel = document.getElementById("statusLabel");
@@ -191,12 +194,51 @@
     const breakInput = document.getElementById("breakInput");
     const focusTab = document.getElementById("focusTab");
     const breakTab = document.getElementById("breakTab");
+    const soundBtn = document.getElementById("soundBtn");
     const demoPresetBtn = document.getElementById("demoPresetBtn");
     const normalPresetBtn = document.getElementById("normalPresetBtn");
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
     const resetBtn = document.getElementById("resetBtn");
     const setBtn = document.getElementById("setBtn");
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
+    }
+
+    function playSound(type = "focusEnd") {
+      if (!soundOn) return;
+      initAudio();
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+      const notes = type === "focusEnd" ? [659.25, 523.25] : [523.25, 659.25, 783.99];
+
+      notes.forEach((freq, idx) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+
+        gain.gain.setValueAtTime(0.12, now + idx * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.14 + 0.25);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now + idx * 0.14);
+        osc.stop(now + idx * 0.14 + 0.26);
+      });
+    }
 
     function render() {
       const m = String(Math.floor(sec / 60)).padStart(2, "0");
@@ -205,6 +247,8 @@
       statusLabel.textContent = mode === "focus" ? "集中モード" : "休憩モード";
       focusInput.value = focusSec;
       breakInput.value = breakSec;
+      soundBtn.textContent = soundOn ? "音: ON" : "音: OFF";
+      soundBtn.classList.toggle("active", soundOn);
       document.body.classList.toggle("running", running);
       focusTab.classList.toggle("active", mode === "focus");
       breakTab.classList.toggle("active", mode === "break");
@@ -229,6 +273,15 @@
       render();
     }
 
+    soundBtn.onclick = () => {
+      soundOn = !soundOn;
+      if (soundOn) {
+        initAudio();
+        playSound("breakEnd");
+      }
+      render();
+    };
+
     focusTab.onclick = () => switchMode("focus");
     breakTab.onclick = () => switchMode("break");
 
@@ -238,6 +291,7 @@
     setBtn.onclick = () => applyCycle(focusInput.value, breakInput.value);
 
     startBtn.onclick = () => {
+      initAudio();
       running = true;
       document.documentElement.requestFullscreen?.().catch(() => {});
       render();
@@ -262,11 +316,12 @@
         sec--;
         render();
       } else {
-        // 0になったら次のモードへ自動切り替えして続行
         if (mode === "focus") {
+          playSound("focusEnd");
           mode = "break";
           sec = breakSec;
         } else {
+          playSound("breakEnd");
           mode = "focus";
           sec = focusSec;
         }
