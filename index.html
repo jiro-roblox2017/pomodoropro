@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Timer</title>
+  <title>Timer (Demo)</title>
   <style>
     html, body {
       margin: 0;
@@ -32,15 +32,17 @@
       gap: 12px;
     }
 
-    .mode-switch {
+    .mode-switch, .preset-switch {
       display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 10px;
     }
 
-    .mode-btn {
-      font-size: 16px;
+    .mode-btn, .preset-btn {
+      font-size: 15px;
       font-weight: bold;
-      padding: 8px 22px;
+      padding: 8px 20px;
       border-radius: 999px;
       border: 2px solid #DEE2E6;
       background: #fff;
@@ -52,6 +54,11 @@
       border-color: #0095D9;
       background: #0095D9;
       color: #fff;
+    }
+
+    .preset-btn.demo {
+      border-color: #0095D9;
+      color: #0095D9;
     }
 
     .setting-row {
@@ -106,6 +113,13 @@
       border-color: #0095D9;
     }
 
+    .status-label {
+      font-size: 16px;
+      font-weight: bold;
+      color: #0095D9;
+      letter-spacing: 0.06em;
+    }
+
     #time {
       font-size: 84px;
       font-weight: bold;
@@ -118,8 +132,8 @@
       gap: 16px;
     }
 
-    /* 作動中はタイマーと停止ボタンのみ表示 */
     body.running .top,
+    body.running .status-label,
     body.running #resetBtn {
       display: none;
     }
@@ -137,18 +151,24 @@
         <button id="breakTab" class="mode-btn">休憩</button>
       </div>
 
+      <div class="preset-switch">
+        <button id="demoPresetBtn" class="preset-btn demo">デモ：集中5秒 / 休憩2秒</button>
+        <button id="normalPresetBtn" class="preset-btn">通常：集中25分 / 休憩5分</button>
+      </div>
+
       <div class="setting-row">
         <span>集中</span>
-        <input id="focusInput" type="number" min="1" max="180" value="25" />
-        <span>分</span>
+        <input id="focusInput" type="number" min="1" max="180" value="5" />
+        <span>秒</span>
         <span>／ 休憩</span>
-        <input id="breakInput" type="number" min="1" max="60" value="5" />
-        <span>分</span>
+        <input id="breakInput" type="number" min="1" max="180" value="2" />
+        <span>秒</span>
         <button id="setBtn" class="round-btn small">セット</button>
       </div>
     </div>
 
-    <div id="time">25:00</div>
+    <div id="statusLabel" class="status-label">集中モード</div>
+    <div id="time">00:05</div>
 
     <div class="btns">
       <button id="startBtn" class="round-btn primary">開始</button>
@@ -158,17 +178,21 @@
   </div>
 
   <script>
-    let focusMin = 25;
-    let breakMin = 5;
+    // デモ用に初期値を 集中5秒 / 休憩2秒 に設定
+    let focusSec = 5;
+    let breakSec = 2;
     let mode = "focus"; // "focus" | "break"
-    let sec = focusMin * 60;
+    let sec = focusSec;
     let running = false;
 
     const timeEl = document.getElementById("time");
+    const statusLabel = document.getElementById("statusLabel");
     const focusInput = document.getElementById("focusInput");
     const breakInput = document.getElementById("breakInput");
     const focusTab = document.getElementById("focusTab");
     const breakTab = document.getElementById("breakTab");
+    const demoPresetBtn = document.getElementById("demoPresetBtn");
+    const normalPresetBtn = document.getElementById("normalPresetBtn");
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
     const resetBtn = document.getElementById("resetBtn");
@@ -178,6 +202,9 @@
       const m = String(Math.floor(sec / 60)).padStart(2, "0");
       const s = String(sec % 60).padStart(2, "0");
       timeEl.textContent = `${m}:${s}`;
+      statusLabel.textContent = mode === "focus" ? "集中モード" : "休憩モード";
+      focusInput.value = focusSec;
+      breakInput.value = breakSec;
       document.body.classList.toggle("running", running);
       focusTab.classList.toggle("active", mode === "focus");
       breakTab.classList.toggle("active", mode === "break");
@@ -185,23 +212,30 @@
       stopBtn.style.display = running ? "inline-block" : "none";
     }
 
+    function applyCycle(newFocusSec, newBreakSec) {
+      running = false;
+      focusSec = Math.max(1, Number(newFocusSec) || 5);
+      breakSec = Math.max(1, Number(newBreakSec) || 2);
+      mode = "focus";
+      sec = focusSec;
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      render();
+    }
+
     function switchMode(newMode) {
       running = false;
       mode = newMode;
-      sec = (mode === "focus" ? focusMin : breakMin) * 60;
+      sec = mode === "focus" ? focusSec : breakSec;
       render();
     }
 
     focusTab.onclick = () => switchMode("focus");
     breakTab.onclick = () => switchMode("break");
 
-    setBtn.onclick = () => {
-      running = false;
-      focusMin = Math.max(1, Number(focusInput.value) || 25);
-      breakMin = Math.max(1, Number(breakInput.value) || 5);
-      sec = (mode === "focus" ? focusMin : breakMin) * 60;
-      render();
-    };
+    demoPresetBtn.onclick = () => applyCycle(5, 2);
+    normalPresetBtn.onclick = () => applyCycle(25 * 60, 5 * 60);
+
+    setBtn.onclick = () => applyCycle(focusInput.value, breakInput.value);
 
     startBtn.onclick = () => {
       running = true;
@@ -217,30 +251,26 @@
 
     resetBtn.onclick = () => {
       running = false;
-      sec = (mode === "focus" ? focusMin : breakMin) * 60;
+      sec = mode === "focus" ? focusSec : breakSec;
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
       render();
     };
 
     setInterval(() => {
       if (!running) return;
-      if (sec > 0) {
+      if (sec > 1) {
         sec--;
         render();
       } else {
-        running = false;
-        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        // 0になったら次のモードへ自動切り替えして続行
         if (mode === "focus") {
           mode = "break";
-          sec = breakMin * 60;
-          render();
-          alert("集中終了！休憩に切り替わりました。");
+          sec = breakSec;
         } else {
           mode = "focus";
-          sec = focusMin * 60;
-          render();
-          alert("休憩終了！集中に切り替わりました。");
+          sec = focusSec;
         }
+        render();
       }
     }, 1000);
 
