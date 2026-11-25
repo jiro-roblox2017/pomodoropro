@@ -22,75 +22,153 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 20px;
     }
 
     .top {
       display: flex;
-      gap: 8px;
+      flex-direction: column;
       align-items: center;
+      gap: 12px;
     }
 
-    #time {
-      font-size: 72px;
-      font-weight: bold;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .btns {
+    .mode-switch {
       display: flex;
       gap: 10px;
     }
 
-    button, input {
+    .mode-btn {
       font-size: 16px;
-      padding: 6px 12px;
-      border: 1px solid #212529;
+      font-weight: bold;
+      padding: 8px 22px;
+      border-radius: 999px;
+      border: 2px solid #DEE2E6;
       background: #fff;
       color: #212529;
       cursor: pointer;
     }
 
-    #startBtn {
+    .mode-btn.active {
+      border-color: #0095D9;
+      background: #0095D9;
+      color: #fff;
+    }
+
+    .setting-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      align-items: center;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    input[type="number"] {
+      width: 68px;
+      font-size: 18px;
+      padding: 8px 10px;
+      border: 2px solid #CED4DA;
+      border-radius: 12px;
+      background: #fff;
+      color: #212529;
+      text-align: center;
+    }
+
+    .round-btn {
+      font-size: 20px;
+      font-weight: bold;
+      padding: 12px 32px;
+      border-radius: 999px;
+      border: 2px solid #212529;
+      background: #fff;
+      color: #212529;
+      cursor: pointer;
+      transition: transform 0.1s ease, opacity 0.15s ease;
+    }
+
+    .round-btn:hover {
+      opacity: 0.88;
+    }
+
+    .round-btn:active {
+      transform: scale(0.97);
+    }
+
+    .round-btn.small {
+      font-size: 16px;
+      padding: 9px 22px;
+    }
+
+    .round-btn.primary {
       background: #0095D9;
       color: #fff;
       border-color: #0095D9;
     }
 
+    #time {
+      font-size: 84px;
+      font-weight: bold;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.05;
+    }
+
+    .btns {
+      display: flex;
+      gap: 16px;
+    }
+
+    /* 作動中はタイマーと停止ボタンのみ表示 */
     body.running .top,
     body.running #resetBtn {
       display: none;
     }
 
     body.running #time {
-      font-size: 120px;
+      font-size: 132px;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="top">
-      <input id="minInput" type="number" min="1" max="180" value="25" style="width:70px;" />
-      <span>分</span>
-      <button id="setBtn">セット</button>
+      <div class="mode-switch">
+        <button id="focusTab" class="mode-btn active">集中</button>
+        <button id="breakTab" class="mode-btn">休憩</button>
+      </div>
+
+      <div class="setting-row">
+        <span>集中</span>
+        <input id="focusInput" type="number" min="1" max="180" value="25" />
+        <span>分</span>
+        <span>／ 休憩</span>
+        <input id="breakInput" type="number" min="1" max="60" value="5" />
+        <span>分</span>
+        <button id="setBtn" class="round-btn small">セット</button>
+      </div>
     </div>
 
     <div id="time">25:00</div>
 
     <div class="btns">
-      <button id="startBtn">開始</button>
-      <button id="stopBtn" style="display:none;">停止</button>
-      <button id="resetBtn">リセット</button>
+      <button id="startBtn" class="round-btn primary">開始</button>
+      <button id="stopBtn" class="round-btn primary" style="display:none;">停止</button>
+      <button id="resetBtn" class="round-btn">リセット</button>
     </div>
   </div>
 
   <script>
-    let baseMin = 25;
-    let sec = baseMin * 60;
+    let focusMin = 25;
+    let breakMin = 5;
+    let mode = "focus"; // "focus" | "break"
+    let sec = focusMin * 60;
     let running = false;
 
     const timeEl = document.getElementById("time");
-    const minInput = document.getElementById("minInput");
+    const focusInput = document.getElementById("focusInput");
+    const breakInput = document.getElementById("breakInput");
+    const focusTab = document.getElementById("focusTab");
+    const breakTab = document.getElementById("breakTab");
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
     const resetBtn = document.getElementById("resetBtn");
@@ -101,14 +179,27 @@
       const s = String(sec % 60).padStart(2, "0");
       timeEl.textContent = `${m}:${s}`;
       document.body.classList.toggle("running", running);
+      focusTab.classList.toggle("active", mode === "focus");
+      breakTab.classList.toggle("active", mode === "break");
       startBtn.style.display = running ? "none" : "inline-block";
       stopBtn.style.display = running ? "inline-block" : "none";
     }
 
+    function switchMode(newMode) {
+      running = false;
+      mode = newMode;
+      sec = (mode === "focus" ? focusMin : breakMin) * 60;
+      render();
+    }
+
+    focusTab.onclick = () => switchMode("focus");
+    breakTab.onclick = () => switchMode("break");
+
     setBtn.onclick = () => {
       running = false;
-      baseMin = Math.max(1, Number(minInput.value) || 25);
-      sec = baseMin * 60;
+      focusMin = Math.max(1, Number(focusInput.value) || 25);
+      breakMin = Math.max(1, Number(breakInput.value) || 5);
+      sec = (mode === "focus" ? focusMin : breakMin) * 60;
       render();
     };
 
@@ -126,7 +217,7 @@
 
     resetBtn.onclick = () => {
       running = false;
-      sec = baseMin * 60;
+      sec = (mode === "focus" ? focusMin : breakMin) * 60;
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
       render();
     };
@@ -139,8 +230,17 @@
       } else {
         running = false;
         if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-        render();
-        alert("終了！");
+        if (mode === "focus") {
+          mode = "break";
+          sec = breakMin * 60;
+          render();
+          alert("集中終了！休憩に切り替わりました。");
+        } else {
+          mode = "focus";
+          sec = focusMin * 60;
+          render();
+          alert("休憩終了！集中に切り替わりました。");
+        }
       }
     }, 1000);
 
