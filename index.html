@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Timer (v2)</title>
+  <title>Timer (v3)</title>
   <style>
     html, body {
       margin: 0;
@@ -20,9 +20,126 @@
       height: 100%;
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 28px;
+      box-sizing: border-box;
+    }
+
+    /* 上部：時刻 / 目標 / 連続記録の枠組み */
+    .hud-top {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: start;
+      gap: 16px;
+    }
+
+    /* ① 左上：時刻・天気 */
+    .clock-box {
+      line-height: 1.3;
+      font-weight: bold;
+    }
+
+    .clock-time {
+      font-size: 32px;
+    }
+
+    .clock-sub {
+      font-size: 18px;
+      margin-top: 4px;
+    }
+
+    /* ② 中央：目標カード枠 */
+    .goal-card {
+      width: 240px;
+      border: 2px solid #212529;
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px 12px;
+      box-sizing: border-box;
+    }
+
+    .goal-title {
+      font-size: 15px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .goal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .goal-item {
+      border: 1px solid #212529;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      background: #F8F9FA;
+    }
+
+    /* ③ 右上：Duolingo風 連続記録枠 */
+    .streak-card {
+      justify-self: end;
+      border: 3px solid #FF9600;
+      border-radius: 16px;
+      background: #fff;
+      padding: 12px 16px;
+      box-shadow: 0 0 0 3px rgba(255, 150, 0, 0.22);
+    }
+
+    .streak-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .streak-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .streak-icon {
+      height: 22px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 20px;
+      font-size: 18px;
+    }
+
+    .streak-circle {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #212529;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .divider {
+      width: 320px;
+      height: 2px;
+      background: #212529;
+      margin: 12px auto 0;
+    }
+
+    /* 下部：タイマー本体 */
+    .timer-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
     }
 
     .top {
@@ -48,7 +165,6 @@
       background: #fff;
       color: #212529;
       cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
     }
 
     .mode-btn.active {
@@ -57,31 +173,19 @@
       color: #fff;
     }
 
-    /* デモ：白背景・青枠/青文字 */
     .preset-btn.demo {
       border-color: #0095D9;
       background: #fff;
       color: #0095D9;
     }
 
-    .preset-btn.demo.active {
-      border-color: #0095D9;
-      background: #fff;
-      color: #0095D9;
-      box-shadow: 0 0 0 2px rgba(0, 149, 217, 0.25);
-    }
-
-    /* 通常：青背景・白文字 */
     .preset-btn.normal {
       border-color: #0095D9;
       background: #0095D9;
       color: #fff;
     }
 
-    .preset-btn.normal.active {
-      border-color: #0095D9;
-      background: #0095D9;
-      color: #fff;
+    .preset-btn.active {
       box-shadow: 0 0 0 2px rgba(0, 149, 217, 0.25);
     }
 
@@ -115,15 +219,6 @@
       background: #fff;
       color: #212529;
       cursor: pointer;
-      transition: transform 0.1s ease, opacity 0.15s ease;
-    }
-
-    .round-btn:hover {
-      opacity: 0.88;
-    }
-
-    .round-btn:active {
-      transform: scale(0.97);
     }
 
     .round-btn.small {
@@ -141,7 +236,6 @@
       font-size: 16px;
       font-weight: bold;
       color: #0095D9;
-      letter-spacing: 0.06em;
     }
 
     #time {
@@ -156,6 +250,9 @@
       gap: 16px;
     }
 
+    /* 作動中はフルスクリーン＆タイマーと停止ボタンのみ */
+    body.running .hud-top,
+    body.running .divider,
     body.running .top,
     body.running .status-label,
     body.running #resetBtn {
@@ -169,36 +266,66 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
-      <div class="mode-switch">
-        <button id="focusTab" class="mode-btn active">集中</button>
-        <button id="breakTab" class="mode-btn">休憩</button>
-        <button id="soundBtn" class="mode-btn active">音: 中</button>
+    <div class="hud-top">
+      <!-- ① 時刻枠 -->
+      <div class="clock-box">
+        <div class="clock-time" id="clockTime">12：34<span style="font-size:20px;margin-left:6px;">東京</span></div>
+        <div class="clock-sub">東京晴れ23度</div>
       </div>
 
-      <div class="preset-switch">
-        <button id="demoPresetBtn" class="preset-btn demo active">デモ：集中5秒 / 休憩2秒</button>
-        <button id="normalPresetBtn" class="preset-btn normal">通常：集中25分 / 休憩5分</button>
+      <!-- ② 目標枠 -->
+      <div class="goal-card">
+        <div class="goal-title">
+          <span>平日の目標</span>
+          <span>×</span>
+        </div>
+        <div class="goal-list">
+          <div class="goal-item">数学やる</div>
+          <div class="goal-item">英語やる</div>
+          <div class="goal-item">漢字やる</div>
+        </div>
       </div>
 
-      <div class="setting-row">
-        <span>集中</span>
-        <input id="focusInput" type="number" min="1" max="180" value="5" />
-        <span id="focusUnit">秒</span>
-        <span>／ 休憩</span>
-        <input id="breakInput" type="number" min="1" max="180" value="2" />
-        <span id="breakUnit">秒</span>
-        <button id="setBtn" class="round-btn small">セット</button>
+      <!-- ③ Duolingo風 連続記録枠 -->
+      <div class="streak-card">
+        <div class="streak-days" id="streakDays"></div>
       </div>
     </div>
 
-    <div id="statusLabel" class="status-label">集中モード</div>
-    <div id="time">00:05</div>
+    <div class="divider"></div>
 
-    <div class="btns">
-      <button id="startBtn" class="round-btn primary">開始</button>
-      <button id="stopBtn" class="round-btn primary" style="display:none;">停止</button>
-      <button id="resetBtn" class="round-btn">リセット</button>
+    <div class="timer-area">
+      <div class="top">
+        <div class="mode-switch">
+          <button id="focusTab" class="mode-btn active">集中</button>
+          <button id="breakTab" class="mode-btn">休憩</button>
+          <button id="soundBtn" class="mode-btn active">音: 中</button>
+        </div>
+
+        <div class="preset-switch">
+          <button id="demoPresetBtn" class="preset-btn demo active">デモ：集中5秒 / 休憩2秒</button>
+          <button id="normalPresetBtn" class="preset-btn normal">通常：集中25分 / 休憩5分</button>
+        </div>
+
+        <div class="setting-row">
+          <span>集中</span>
+          <input id="focusInput" type="number" min="1" max="180" value="5" />
+          <span id="focusUnit">秒</span>
+          <span>／ 休憩</span>
+          <input id="breakInput" type="number" min="1" max="180" value="2" />
+          <span id="breakUnit">秒</span>
+          <button id="setBtn" class="round-btn small">セット</button>
+        </div>
+      </div>
+
+      <div id="statusLabel" class="status-label">集中モード</div>
+      <div id="time">00:05</div>
+
+      <div class="btns">
+        <button id="startBtn" class="round-btn primary">開始</button>
+        <button id="stopBtn" class="round-btn primary" style="display:none;">停止</button>
+        <button id="resetBtn" class="round-btn">リセット</button>
+      </div>
     </div>
   </div>
 
@@ -210,10 +337,13 @@
       { label: "音: 大", gain: 0.32 }
     ];
 
-    let unitMode = "sec"; // "sec"（デモ・秒） | "min"（通常・分）
+    const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
+    let flames = [true, true, true, true, true, true, false];
+
+    let unitMode = "sec";
     let focusSec = 5;
     let breakSec = 2;
-    let mode = "focus"; // "focus" | "break"
+    let mode = "focus";
     let sec = focusSec;
     let running = false;
     let volumeIndex = 2;
@@ -234,13 +364,39 @@
     const stopBtn = document.getElementById("stopBtn");
     const resetBtn = document.getElementById("resetBtn");
     const setBtn = document.getElementById("setBtn");
+    const clockTimeEl = document.getElementById("clockTime");
+    const streakDaysEl = document.getElementById("streakDays");
+
+    function updateClock() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      clockTimeEl.innerHTML = `${hh}：${mm}<span style="font-size:20px;margin-left:6px;">東京</span>`;
+    }
+
+    function renderStreak() {
+      streakDaysEl.innerHTML = "";
+      DAYS.forEach((d, idx) => {
+        const col = document.createElement("div");
+        col.className = "streak-col";
+        const icon = document.createElement("div");
+        icon.className = "streak-icon";
+        icon.innerHTML = flames[idx] ? "🔥" : '<span class="streak-circle"></span>';
+        const label = document.createElement("div");
+        label.textContent = d;
+        col.onclick = () => {
+          flames[idx] = !flames[idx];
+          renderStreak();
+        };
+        col.append(icon, label);
+        streakDaysEl.appendChild(col);
+      });
+    }
 
     function initAudio() {
       if (!audioCtx) {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          audioCtx = new AudioContextClass();
-        }
+        if (AudioContextClass) audioCtx = new AudioContextClass();
       }
       if (audioCtx && audioCtx.state === "suspended") {
         audioCtx.resume().catch(() => {});
@@ -264,16 +420,12 @@
       notes.forEach((freq, idx) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, now + idx * 0.14);
-
         gain.gain.setValueAtTime(vol, now + idx * 0.14);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.14 + 0.24);
-
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-
         osc.start(now + idx * 0.14);
         osc.stop(now + idx * 0.14 + 0.25);
       });
@@ -332,13 +484,9 @@
     focusTab.onclick = () => switchMode("focus");
     breakTab.onclick = () => switchMode("break");
 
-    // デモ：秒単位・白ボタン
     demoPresetBtn.onclick = () => applyCycle(5, 2, "sec");
-
-    // 通常：分単位・青ボタン
     normalPresetBtn.onclick = () => applyCycle(25 * 60, 5 * 60, "min");
 
-    // セットボタン：現在の単位（分または秒）に合わせて反映
     setBtn.onclick = () => {
       const multiplier = unitMode === "min" ? 60 : 1;
       const fVal = Math.max(1, Number(focusInput.value) || 1) * multiplier;
@@ -385,6 +533,9 @@
       }
     }, 1000);
 
+    updateClock();
+    setInterval(updateClock, 10000);
+    renderStreak();
     render();
   </script>
 </body>
